@@ -1,2 +1,2 @@
 # ECON-573
-Machine Learning with Applications in Finance.
+Machine Learning/Econometrics project for AirBnB data.
