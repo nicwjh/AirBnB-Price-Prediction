@@ -1,0 +1,27 @@
+---
+title: "Final Project"
+author: 'Nicholas Wong'
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output:
+  pdf_document: default
+---
+# Abstract #
+TODO - describe goals of analysis, questions to be answered etc.
+
+# Data Pre-processing # 
+
+TODO - briefly describe data preprocessing procedure 
+
+```{r message = F}
+library(tidyverse)
+```
+
+```{r message = F}
+airbnb <- read_csv("airbnb.csv")
+
+airbnb <- airbnb |> 
+  select(-c("amenities", "description", "name", "thumbnail_url"))
+
+names(airbnb)
+glimpse(airbnb)
+```
