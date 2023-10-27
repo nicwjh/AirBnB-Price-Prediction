@@ -5,23 +5,49 @@ date: "`r format(Sys.time(), '%B %d, %Y')`"
 output:
   pdf_document: default
 ---
-# Abstract #
-TODO - describe goals of analysis, questions to be answered etc.
 
-# Data Pre-processing # 
-
-TODO - briefly describe data preprocessing procedure 
+R set-up 
 
 ```{r message = F}
 library(tidyverse)
+library(ISLR)
+library(leaps)
+library(glmnet)
+library(pls)
+library(MASS)
+library(caret)
 ```
 
+**Data pre-processing** 
 ```{r message = F}
-airbnb <- read_csv("airbnb.csv")
+airbnb <- read_csv("airbnb.csv",
+                   col_select = -c("id", "amenities", "description", "name", "thumbnail_url"))
 
-airbnb <- airbnb |> 
-  select(-c("amenities", "description", "name", "thumbnail_url"))
 
-names(airbnb)
-glimpse(airbnb)
+
+set.seed(123)
+
+# 80/20 train/test split 
+training_indices <- sample(1:74111, 60000)
+
+# Split data into train and test sets 
+train <- airbnb[training_indices, ]
+test <- airbnb[-training_indices, ] # keep as unseen data 
 ```
+
+**Model selection - forward/backward** 
+
+Forward selection 
+```{r}
+full = lm(log_price ~., data=train)
+none = lm(log_price ~., data = train)
+MSE = (summary(full)$sigma)^2
+forward_selection_mod <- step(none, scope = list(upper = full), scale = MSE, direction = 'forward', trace=FALSE)
+
+summary(forward_selection_mod)
+plot(forward_selection_mod)
+```
+
+
+
+
