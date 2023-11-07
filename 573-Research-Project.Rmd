@@ -16,10 +16,18 @@ library(glmnet)
 library(pls)
 library(MASS)
 library(caret)
+library(corrplot)
+library(ggplot2)
+library(sf)
+library(RColorBrewer)
+library(gridExtra)
+
+airbnb <- read_csv("train.csv",
+                   col_select = -c("id", "amenities", "description", "name", "thumbnail_url"))
 ```
 
 **Data pre-processing** 
-```{r message = F}
+```{r message = F, include = F}
 airbnb <- read_csv("airbnb.csv",
                    col_select = -c("id", "amenities", "description", "name", "thumbnail_url"))
 
@@ -35,7 +43,7 @@ train <- airbnb[training_indices, ]
 test <- airbnb[-training_indices, ] # keep as unseen data 
 ```
 
-**Model selection - forward/backward** 
+# Method 1 - Forward Selection # 
 
 Forward selection 
 ```{r}
