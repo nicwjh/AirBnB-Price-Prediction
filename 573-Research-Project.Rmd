@@ -22,15 +22,12 @@ library(sf)
 library(RColorBrewer)
 library(gridExtra)
 
-airbnb <- read_csv("train.csv",
+airbnb <- read_csv("airbnb.csv",
                    col_select = -c("id", "amenities", "description", "name", "thumbnail_url"))
 ```
 
 **Data pre-processing** 
 ```{r message = F, include = F}
-airbnb <- read_csv("airbnb.csv",
-                   col_select = -c("id", "amenities", "description", "name", "thumbnail_url"))
-
 
 
 set.seed(123)
