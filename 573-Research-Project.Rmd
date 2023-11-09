@@ -1,5 +1,5 @@
 ---
-title: "Final Project"
+title: "ECON573 Final Project"
 author: 'Nicholas Wong'
 date: "`r format(Sys.time(), '%B %d, %Y')`"
 output:
@@ -21,38 +21,89 @@ library(ggplot2)
 library(sf)
 library(RColorBrewer)
 library(gridExtra)
+library(modelr)
+library(knitr)
+
 
 airbnb <- read_csv("airbnb.csv",
-                   col_select = -c("id", "amenities", "description", "name", "thumbnail_url"))
+                  col_select = -c("id", "amenities", "description", "name", "thumbnail_url", "neighbourhood", "zipcode"))
 ```
 
-**Data pre-processing** 
-```{r message = F, include = F}
-
-
+**Data cleaning/pre-processing** 
+```{r}
 set.seed(123)
 
+# Mutate original price variable 
+airbnb <- airbnb |> 
+  mutate(price = exp(log_price)) 
+
+# Drop NAs
+airbnb <- na.omit(airbnb) 
+
+# host_response_rate to numeric for easier interpretation 
+airbnb <- airbnb |> 
+  mutate(host_response_rate = str_replace_all(host_response_rate, pattern = "%", replacement = "")) |> 
+  mutate_at(13, as.numeric) 
+
 # 80/20 train/test split 
-training_indices <- sample(1:74111, 60000)
+training_indices <- sample(1:nrow(airbnb), .8*nrow(airbnb))
 
 # Split data into train and test sets 
 train <- airbnb[training_indices, ]
-test <- airbnb[-training_indices, ] # keep as unseen data 
+test <- airbnb[-training_indices, ] # true unseen data for model testing
+
+totalData <- rbind(train, test)
+for (f in 1:length(names(totalData))) {
+  levels(train[, f]) <- levels(totalData[, f])
+  levels(test[,f]) <- levels(totalData[, f])
+}
 ```
 
 # Method 1 - Forward Selection # 
 
-Forward selection 
+Here, we use a validation set approach due to the heavy computational expense of using stepwise methods with K-fold CV. 
+
+_Fitting forward selection on training set_
 ```{r}
-full = lm(log_price ~., data=train)
-none = lm(log_price ~., data = train)
+full = lm(price ~., data=train)
+none = lm(price ~., data = train)
 MSE = (summary(full)$sigma)^2
-forward_selection_mod <- step(none, scope = list(upper = full), scale = MSE, direction = 'forward', trace=FALSE)
+forward_selection_mod <- step(none, scope = list(upper = full), scale = MSE, direction = 'forward', trace=T)
 
 summary(forward_selection_mod)
-plot(forward_selection_mod)
+#plot(forward_selection_mod)
+```
+
+Get predictions and residuals for forward selection, compute MSE 
+```{r}
+test_forwardselection <- test |> add_predictions(forward_selection_mod, var = "forward_pred")
+test_forwardselection <- test_forwardselection |> add_residuals(forward_selection_mod, var = "forward_resid")
+
+# Args: vector of residuals
+# Return: MSE 
+MSE_func <- function(resid){
+  return(mean(resid^2))
+}
+
+MSE_func(test_forwardselection$forward_resid)
+```
+
+MSE for forward selection: 4395.526 
+
+# Method 2 - Lasso # 
+
+```{r}
+
 ```
 
 
+# Cluster Analysis # 
 
+Top 3 priced listings
+```{r}
+#top_500
+
+head(airbnb |> arrange(desc(log_price)) |>  dplyr::select(log_price, city), 3) |> kable()
+```
+2 out of 3 top listings are from NYC. Perform cluster analysis in NYC 
 
