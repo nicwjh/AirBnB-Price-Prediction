@@ -24,7 +24,6 @@ library(gridExtra)
 library(modelr)
 library(knitr)
 
-
 airbnb <- read_csv("airbnb.csv",
                   col_select = -c("id", "amenities", "description", "name", "thumbnail_url", "neighbourhood", "zipcode"))
 ```
@@ -71,7 +70,7 @@ MSE = (summary(full)$sigma)^2
 forward_selection_mod <- step(none, scope = list(upper = full), scale = MSE, direction = 'forward', trace=T)
 
 summary(forward_selection_mod)
-#plot(forward_selection_mod)
+plot(forward_selection_mod)
 ```
 
 Get predictions and residuals for forward selection, compute MSE 
@@ -105,7 +104,13 @@ head(airbnb |> arrange(desc(log_price)) |>  dplyr::select(log_price, city), 3) |
 ```
 2 out of 3 top listings are from NYC. Perform cluster analysis in NYC 
 
+_Beginning NYC cluster analysis_ 
+
+This section requires the accompanying files nyc_boundaries.shp and nyc_boundaries.shx to run (to aid with the geographic map overlay).
 ```{r, eval = T}
+airbnb <- read_csv("airbnb.csv",
+                  col_select = -c("id", "amenities", "description", "name", "thumbnail_url"))
+
 airbnb_NYC <- airbnb |> 
   filter(city == 'NYC') |> 
   filter(!is.na(neighbourhood)) |> 
