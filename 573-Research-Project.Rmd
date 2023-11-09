@@ -101,9 +101,65 @@ MSE for forward selection: 4395.526
 
 Top 3 priced listings
 ```{r}
-#top_500
-
 head(airbnb |> arrange(desc(log_price)) |>  dplyr::select(log_price, city), 3) |> kable()
 ```
 2 out of 3 top listings are from NYC. Perform cluster analysis in NYC 
 
+```{r, eval = T}
+airbnb_NYC <- airbnb |> 
+  filter(city == 'NYC') |> 
+  filter(!is.na(neighbourhood)) |> 
+  filter(log_price >= 0.01)
+```
+
+Here, we create a best_value variable for NYC neighbourhoods, and pick the top 500 to work with.
+```{r, eval = T}
+airbnb_NYC |> 
+  group_by(neighbourhood) |> 
+  filter(!is.na(neighbourhood)) |> 
+  mutate(best_value = review_scores_rating/log_price) |> 
+  arrange(desc(best_value))
+
+top500_NYC <- head(airbnb_NYC, 500)
+```
+
+```{r, eval = T}
+num_listings = table(airbnb_NYC$neighbourhood)
+
+top500_NYC_nbr <- top500_NYC |> 
+  group_by(neighbourhood) |> 
+  filter(num_listings[as.character(neighbourhood)] > 50) |> 
+  summarize(count = n()) |> 
+  mutate(standardized_value = (round(100 * count/num_listings[as.character(neighbourhood)], digits = 4))) |>
+  mutate(count_listings = num_listings[as.character(neighbourhood)]) |> 
+  arrange(desc(standardized_value)) |> 
+  ungroup()
+```
+
+```{r, eval = T}
+top500_locations <- full_join(top500_NYC_nbr, top500_NYC, join_by(neighbourhood)) |> 
+  dplyr::select(neighbourhood, count, standardized_value, longitude, latitude)
+  
+top500 <- top500_locations |> 
+  group_by(neighbourhood) |> 
+  mutate(mean_long = mean(longitude),
+         mean_lat = mean(latitude),
+         standardized_value = as.numeric(standardized_value)) |> 
+  arrange(desc(standardized_value)) |> 
+  distinct(neighbourhood, standardized_value, count, mean_long, mean_lat)
+  
+top10_nbr <- head(top500, 10)
+```
+
+Here, we calculate density of best value listings based on standardized best value in neighborhoods within the top 500 Best Value AirBnb listings in NY. 
+```{r, eval = T}
+nyc <- sf::st_read(dsn = "nyc_boundaries.shp", quiet = TRUE)
+
+  ggplot() +
+  geom_sf(data = nyc, fill = "#d9f2f2") +
+  ggtitle("Best Value AirBnbs in NYC Neighborhoods") +
+  geom_point(data = top10_nbr, aes(x = mean_long, y = mean_lat, size = as.numeric(standardized_value), color = as.factor(neighbourhood))) +
+    scale_size_continuous(range = c(1, 4)) +
+  guides(size = guide_legend(title = "Density of Best Value Listings")) +
+  guides(color = guide_legend(title = "Neighborhood")) + theme_minimal()
+```
