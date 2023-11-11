@@ -79,27 +79,80 @@ test_forwardselection <- test |> add_predictions(forward_selection_mod, var = "f
 test_forwardselection <- test_forwardselection |> add_residuals(forward_selection_mod, var = "forward_resid")
 
 # Args: vector of residuals
-# Return: MSE 
-MSE_func <- function(resid){
-  return(mean(resid^2))
+# Return: RMSE 
+RMSE_func <- function(resid){
+  return(sqrt(mean(resid^2)))
 }
 
-MSE_func(test_forwardselection$forward_resid)
+RMSE_func(test_forwardselection$forward_resid)
 ```
 
-MSE for forward selection: 4395.526 
+# Method 2 - LASSO # 
 
-# Method 2 - Lasso # 
+Here, we select shrinkage parameter $\lambda$ for LASSO through repeated 5-fold CV. 
+We test a range of 16 different $\lambda$ values in (0, 0.3), in equally spaced increments of 0.02.
+```{r warning = F}
+ctrl <- trainControl(method = "repeatedcv", number = 5, repeats = 10, verboseIter = F)
 
+set.seed(1)
+
+model_lasso <- train(price ~ ., 
+                   data = train, 
+                   method = "glmnet", 
+                   preProcess = c("center", "scale"), 
+                     metric = "RMSE",
+                     maximize = F,
+                     trControl = ctrl, 
+                     tuneGrid = expand.grid(alpha = 1, # lasso specification
+                                            lambda = seq(0, 0.3, 0.02)))
+
+model_lasso$results |> 
+  rename(CV_RMSE = RMSE) |> 
+  mutate(min_CV_RMSE = as.numeric(lambda == model_lasso$bestTune$lambda)) |> 
+  ggplot(aes(x = lambda, y = CV_RMSE)) + 
+  geom_line(col = "grey55") + 
+  geom_point(size = 2, aes(col = factor(min_CV_RMSE))) + 
+  scale_color_manual(values = c("deepskyblue3", "green")) + 
+  theme(legend.position = "none") + 
+  labs(title = "AirBnB - Lasso Regression", 
+       subtitle = "Selecting shrinkage parameter with cross-validation",
+       y = "CV RMSE")
+```
+
+
+Optimal shrinkage ($\lambda$): 
 ```{r}
-
+model_lasso$bestTune$lambda 
 ```
 
+CV RMSE:
+```{r eval = F}
+(lasso_cv <- min(model_lasso$results$RMSE) |>  round(4))
+```
+
+Test RMSE: 
+```{r eval = F}
+(lasso_test <- sqrt(mean((predict(model_lasso, test) - test$price)^2)) |>  round(4))
+```
+
+Predictors in final fitted LASSO model: 
+```{r}
+tibble(names = model_lasso$coefnames) |> kable()
+```
+
+# Method 3 - Boosting # 
+
+
+
+#########################################################################################################################
+
+
+#########################################################################################################################
 
 # Cluster Analysis # 
 
 Top 3 priced listings
-```{r}
+```{r eval = F}
 head(airbnb |> arrange(desc(log_price)) |>  dplyr::select(log_price, city), 3) |> kable()
 ```
 2 out of 3 top listings are from NYC. Perform cluster analysis in NYC 
@@ -107,7 +160,7 @@ head(airbnb |> arrange(desc(log_price)) |>  dplyr::select(log_price, city), 3) |
 _Beginning NYC cluster analysis_ 
 
 This section requires the accompanying files nyc_boundaries.shp and nyc_boundaries.shx to run (to aid with the geographic map overlay).
-```{r, eval = T}
+```{r, eval = F}
 airbnb <- read_csv("airbnb.csv",
                   col_select = -c("id", "amenities", "description", "name", "thumbnail_url"))
 
@@ -118,7 +171,7 @@ airbnb_NYC <- airbnb |>
 ```
 
 Here, we create a best_value variable for NYC neighbourhoods, and pick the top 500 to work with.
-```{r, eval = T}
+```{r, eval = F}
 airbnb_NYC |> 
   group_by(neighbourhood) |> 
   filter(!is.na(neighbourhood)) |> 
@@ -128,7 +181,7 @@ airbnb_NYC |>
 top500_NYC <- head(airbnb_NYC, 500)
 ```
 
-```{r, eval = T}
+```{r, eval = F}
 num_listings = table(airbnb_NYC$neighbourhood)
 
 top500_NYC_nbr <- top500_NYC |> 
@@ -141,7 +194,7 @@ top500_NYC_nbr <- top500_NYC |>
   ungroup()
 ```
 
-```{r, eval = T}
+```{r, eval = F}
 top500_locations <- full_join(top500_NYC_nbr, top500_NYC, join_by(neighbourhood)) |> 
   dplyr::select(neighbourhood, count, standardized_value, longitude, latitude)
   
@@ -157,7 +210,7 @@ top10_nbr <- head(top500, 10)
 ```
 
 Here, we calculate density of best value listings based on standardized best value in neighborhoods within the top 500 Best Value AirBnb listings in NY. 
-```{r, eval = T}
+```{r, eval = F}
 nyc <- sf::st_read(dsn = "nyc_boundaries.shp", quiet = TRUE)
 
   ggplot() +
