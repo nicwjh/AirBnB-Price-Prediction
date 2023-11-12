@@ -23,6 +23,7 @@ library(RColorBrewer)
 library(gridExtra)
 library(modelr)
 library(knitr)
+library(gbm)
 
 airbnb <- read_csv("airbnb.csv",
                   col_select = -c("id", "amenities", "description", "name", "thumbnail_url", "neighbourhood", "zipcode"))
@@ -70,7 +71,7 @@ MSE = (summary(full)$sigma)^2
 forward_selection_mod <- step(none, scope = list(upper = full), scale = MSE, direction = 'forward', trace=T)
 
 summary(forward_selection_mod)
-plot(forward_selection_mod)
+plot(forward_selection_mod, 1)
 ```
 
 Get predictions and residuals for forward selection, compute MSE 
@@ -142,9 +143,67 @@ tibble(names = model_lasso$coefnames) |> kable()
 
 # Method 3 - Boosting # 
 
+```{r warning = F}
+lambda_seq <- 10^seq(-6, 0, 0.1)
+
+set.seed(123)
+
+train_MSE <- c()
+test_MSE <- c()
+
+train <- train |> 
+  mutate(property_type = as.factor(property_type),
+         room_type = as.factor(room_type),
+         bed_type = as.factor(bed_type),
+         cancellation_policy = as.factor(cancellation_policy),
+         cleaning_fee = as.factor(cleaning_fee),
+         city = as.factor(city),
+         host_has_profile_pic = as.factor(host_has_profile_pic),
+         host_identity_verified = as.factor(host_identity_verified),
+         instant_bookable = as.factor(instant_bookable)) 
+         
+
+
+for (i in 1:length(lambda_seq)) {
+  boost_TEMP <- gbm(price ~ . -first_review -host_since -last_review, 
+                    data = train, 
+                    distribution = "gaussian", 
+                    n.trees = 1000, 
+                    interaction.depth = 2, 
+                    shrinkage = lambda_seq[i])
+  
+  train_MSE[i] <- mean((predict(boost_TEMP, train, n.trees = 1000) - train$price)^2)
+  
+  test_MSE[i] <- mean((predict(boost_TEMP, test, n.trees = 1000) - test$price)^2)
+}
+
+df <- data.frame(lambda = lambda_seq, test_MSE) |> 
+  mutate(min_MSE = as.numeric(test_MSE == min(test_MSE))) 
+
+df |> 
+  ggplot(aes(x = lambda, y = test_MSE)) + 
+  geom_point(size = 2, aes(col = factor(min_MSE))) + 
+  geom_line(col = "grey55") + 
+  scale_color_manual(values = c("deepskyblue", "green")) +
+  theme(legend.position = "none") + 
+  scale_x_continuous(trans = 'log10', breaks = 10^seq(-6, 0), labels = 10^seq(-6, 0), minor_breaks = NULL) + 
+  labs(x = "Lambda (Shrinkage)", 
+       y = "Test MSE")
+
+(boosting_RMSE <- sqrt(df$test_MSE[which(df$min_MSE == 1)]))
+(boosting_lambda <- df$lambda[which(df$min_MSE == 1)])
+```
+# Method 4 - Polynomial #
+
+```{r}
+
+```
+
 
 
 #########################################################################################################################
+
+ 
 
 
 #########################################################################################################################
