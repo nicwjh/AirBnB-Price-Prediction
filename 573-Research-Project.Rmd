@@ -6,9 +6,7 @@ output:
   pdf_document: default
 ---
 
-R set-up 
-
-```{r message = F}
+```{r message = F, include = F}
 library(tidyverse)
 library(ISLR)
 library(leaps)
@@ -24,6 +22,7 @@ library(gridExtra)
 library(modelr)
 library(knitr)
 library(gbm)
+library(corrplot)
 
 airbnb <- read_csv("airbnb.csv",
                   col_select = -c("id", "amenities", "description", "name", "thumbnail_url", "neighbourhood", "zipcode"))
@@ -35,7 +34,8 @@ set.seed(123)
 
 # Mutate original price variable 
 airbnb <- airbnb |> 
-  mutate(price = exp(log_price)) 
+  mutate(price = exp(log_price),
+         log_price = NULL) 
 
 # Drop NAs
 airbnb <- na.omit(airbnb) 
@@ -43,15 +43,29 @@ airbnb <- na.omit(airbnb)
 # host_response_rate to numeric for easier interpretation 
 airbnb <- airbnb |> 
   mutate(host_response_rate = str_replace_all(host_response_rate, pattern = "%", replacement = "")) |> 
-  mutate_at(13, as.numeric) 
+  mutate_at(12, as.numeric) 
+
+# typecast to factors for fitting boosting
+airbnb <- airbnb |> 
+  mutate(property_type = as.factor(property_type),
+         room_type = as.factor(room_type),
+         bed_type = as.factor(bed_type),
+         cancellation_policy = as.factor(cancellation_policy),
+         cleaning_fee = as.factor(cleaning_fee),
+         city = as.factor(city),
+         host_has_profile_pic = as.factor(host_has_profile_pic),
+         host_identity_verified = as.factor(host_identity_verified),
+         instant_bookable = as.factor(instant_bookable)) 
+
 
 # 80/20 train/test split 
 training_indices <- sample(1:nrow(airbnb), .8*nrow(airbnb))
 
 # Split data into train and test sets 
 train <- airbnb[training_indices, ]
-test <- airbnb[-training_indices, ] # true unseen data for model testing
+test <- airbnb[-training_indices, ] 
 
+# relevel factors for train/test CV
 totalData <- rbind(train, test)
 for (f in 1:length(names(totalData))) {
   levels(train[, f]) <- levels(totalData[, f])
@@ -66,7 +80,7 @@ Here, we use a validation set approach due to the heavy computational expense of
 _Fitting forward selection on training set_
 ```{r}
 full = lm(price ~., data=train)
-none = lm(price ~., data = train)
+none = lm(price ~1, data = train)
 MSE = (summary(full)$sigma)^2
 forward_selection_mod <- step(none, scope = list(upper = full), scale = MSE, direction = 'forward', trace=T)
 
@@ -85,7 +99,7 @@ RMSE_func <- function(resid){
   return(sqrt(mean(resid^2)))
 }
 
-RMSE_func(test_forwardselection$forward_resid)
+(forward_selection_RMSE <- RMSE_func(test_forwardselection$forward_resid))
 ```
 
 # Method 2 - LASSO # 
@@ -116,7 +130,7 @@ model_lasso$results |>
   scale_color_manual(values = c("deepskyblue3", "green")) + 
   theme(legend.position = "none") + 
   labs(title = "AirBnB - Lasso Regression", 
-       subtitle = "Selecting shrinkage parameter with cross-validation",
+       subtitle = "Hyperparameter Tuning - Selecting shrinkage parameter with cross-validation",
        y = "CV RMSE")
 ```
 
@@ -127,13 +141,13 @@ model_lasso$bestTune$lambda
 ```
 
 CV RMSE:
-```{r eval = F}
+```{r }
 (lasso_cv <- min(model_lasso$results$RMSE) |>  round(4))
 ```
 
 Test RMSE: 
-```{r eval = F}
-(lasso_test <- sqrt(mean((predict(model_lasso, test) - test$price)^2)) |>  round(4))
+```{r }
+(lasso_test_RMSE <- sqrt(mean((predict(model_lasso, test) - test$price)^2)) |>  round(4))
 ```
 
 Predictors in final fitted LASSO model: 
@@ -150,18 +164,6 @@ set.seed(123)
 
 train_MSE <- c()
 test_MSE <- c()
-
-train <- train |> 
-  mutate(property_type = as.factor(property_type),
-         room_type = as.factor(room_type),
-         bed_type = as.factor(bed_type),
-         cancellation_policy = as.factor(cancellation_policy),
-         cleaning_fee = as.factor(cleaning_fee),
-         city = as.factor(city),
-         host_has_profile_pic = as.factor(host_has_profile_pic),
-         host_identity_verified = as.factor(host_identity_verified),
-         instant_bookable = as.factor(instant_bookable)) 
-         
 
 
 for (i in 1:length(lambda_seq)) {
@@ -188,27 +190,127 @@ df |>
   theme(legend.position = "none") + 
   scale_x_continuous(trans = 'log10', breaks = 10^seq(-6, 0), labels = 10^seq(-6, 0), minor_breaks = NULL) + 
   labs(x = "Lambda (Shrinkage)", 
-       y = "Test MSE")
+       y = "Test MSE") +
+  labs(title = "AirBnB - Boosting Hyperparameter Tuning", 
+       subtitle = "Selecting shrinkage parameter for boosting with cross-validation",
+       y = "Test Set RMSE")
 
 (boosting_RMSE <- sqrt(df$test_MSE[which(df$min_MSE == 1)]))
 (boosting_lambda <- df$lambda[which(df$min_MSE == 1)])
 ```
-# Method 4 - Polynomial #
-
 ```{r}
 
 ```
 
 
+# Method 4 - Polynomial #
+
+First, we perform an exploratory data analysis (EDA) to find the variable for polynomial fit
+```{r}
+airbnb_numeric <- airbnb[, sapply(airbnb, is.numeric)]
+corrplot::corrplot(cor(airbnb_numeric))
+```
+
+Highest correlation with "accommodates". Use accommodates for polynomial fit.
+
+Here, we opt for K-fold CV to choose the optimal degree for the polynomial. 
+We perform 10-fold CV with 5 repeats.
+
+```{r eval = F}
+ctrl <- trainControl(method = "repeatedcv", number = 10, repeats = 5)
+
+CV_RMSE <- c()
+
+set.seed(159)
+
+for (i in 1:10) {
+  model_temp <- train(y = train$price,
+                      x = poly(train$accommodates, i, raw = T, simple = T),
+                      method = "lm",
+                      metric = "RMSE",
+                      trControl = ctrl)
+  CV_RMSE[i] <- model_temp$results$RMSE
+}
+
+data.frame(degree = 1:10, CV_RMSE = CV_RMSE) |> 
+  mutate(min_CV_RMSE = as.numeric(min(CV_RMSE) == CV_RMSE)) |> 
+  ggplot(aes(x = degree, y = CV_RMSE)) +
+  geom_line(col = "grey55") +
+  geom_point(size = 2, aes(col = factor(min_CV_RMSE))) +
+  scale_x_continuous(breaks = seq(1, 10), minor_breaks = NULL) +
+  scale_y_continuous(breaks = seq(0, 0.03, 0.002)) +
+  scale_color_manual(values = c("deepskyblue3", "green")) +
+  theme(legend.position = "none") +
+  labs(title = "AirBnB Dataset - Polynomial Regression Hyperparameter Tuning",
+       subtitle = "Selecting the 'accommodates' polynomial degree with cross-validation RMSE",
+       x = "Degree",
+       y = "Cross-Validation RMSE")
+```
+We find that polynomial degree 6 minimizes RMSE
+
+```{r eval = F}
+# store minimum polynomial RMSE for reference
+(min_poly_RMSE_raw <- min(CV_RMSE))
+```
+Now, we use a validation set approach to test on unseen test data
+```{r}
+polymod <- lm(price ~ poly(accommodates, 6, raw = T), data = train)
+
+test_poly <- test |> add_predictions(polymod, var = "poly_pred")
+test_poly <- test_poly |> add_residuals(polymod, var = "poly_resid")
+
+(poly_RMSE <- RMSE_func(test_poly$poly_resid))
+```
+
+```{r}
+#summary(polymod)
+tidy(polymod)
+```
+
+# Summary of test error for methods 
+
+```{r}
+(RMSE_summary <- tibble(Method = c("Forward Selection", "LASSO", "Polynomial Regression", "Boosting"), RMSE = c(forward_selection_RMSE, lasso_test_RMSE, poly_RMSE, boosting_RMSE)))
+
+RMSE_summary |> 
+  mutate(min_RMSE = as.numeric(min(RMSE) == RMSE)) |> 
+  ggplot(aes(x = Method, y = RMSE)) + 
+  geom_col(aes(fill = factor(min_RMSE), color = factor(min_RMSE))) +
+  scale_fill_manual(values = c("deepskyblue", "green")) + 
+  scale_color_manual(values = c("black", "red")) +
+  theme(legend.position = "none") +
+  labs(title = "AirBnB Dataset - Test RMSE summary",
+       subtitle = "Predictive performance of various models on 20% unseen held-out data",
+       x = "Method",
+       y = "Validation Set RMSE")
+```
+
+
+
+######################################################REF############################################################
+
+```{r}
+summary(model_gbm$finalModel)
+
+# ggplot version:
+summary(model_gbm$finalModel, plotit = F) %>%
+  rename("Importance" = "rel.inf") %>%
+  ggplot(aes(x = reorder(var, Importance), y = Importance, fill = Importance)) + 
+  geom_bar(stat = "identity") + 
+  geom_text(aes(label = round(Importance, 2), col = Importance), hjust = -0.2) + 
+  scale_y_continuous(limits = c(0, 31.5)) +
+  scale_fill_gradient(low = "grey40", high = "#28B463") + 
+  scale_color_gradient(low = "grey40", high = "#28B463") +
+  coord_flip() + 
+  theme(legend.position = "none") + 
+  labs(title = "Hitters Dataset - Boosting - Variable Importance", 
+       x = "Varname")
+```
+
 
 #########################################################################################################################
 
- 
-
-
-#########################################################################################################################
-
-# Cluster Analysis # 
+# Cluster Analysis for NYC # 
 
 Top 3 priced listings
 ```{r eval = F}
