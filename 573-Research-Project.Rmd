@@ -23,6 +23,7 @@ library(modelr)
 library(knitr)
 library(gbm)
 library(corrplot)
+library(broom)
 
 airbnb <- read_csv("airbnb.csv",
                   col_select = -c("id", "amenities", "description", "name", "thumbnail_url", "neighbourhood", "zipcode"))
@@ -101,6 +102,11 @@ RMSE_func <- function(resid){
 
 (forward_selection_RMSE <- RMSE_func(test_forwardselection$forward_resid))
 ```
+```{r}
+tidy(forward_selection_mod) |> 
+  filter(p.value < .05)
+```
+
 
 # Method 2 - LASSO # 
 
@@ -157,7 +163,8 @@ tibble(names = model_lasso$coefnames) |> kable()
 
 # Method 3 - Boosting # 
 
-```{r warning = F}
+Validation set approach for gbm
+```{r warning = F, eval = T}
 lambda_seq <- 10^seq(-6, 0, 0.1)
 
 set.seed(123)
@@ -198,8 +205,84 @@ df |>
 (boosting_RMSE <- sqrt(df$test_MSE[which(df$min_MSE == 1)]))
 (boosting_lambda <- df$lambda[which(df$min_MSE == 1)])
 ```
-```{r}
 
+This is the 5-fold CV approach. May phase out because its extremely computationally expensive.
+Right now, I'm just trying to use this code chunk to generate the variable importance plot since the model wasn't stored above.
+```{r warning = F, eval = F}
+
+set.seed(1)
+
+ctrl <- trainControl(method = "cv", number = 5, verboseIter = F)
+
+gbm_grid <- expand.grid(n.trees = 1000, interaction.depth = 2, n.minobsinnode = 10, shrinkage = 10^seq(-6, 0, 0.1))
+
+model_gbm <- train(price ~ .-first_review -host_since -last_review, 
+                   data = train, 
+                   method = "gbm",
+                   distribution = "gaussian", 
+                   verbose = F,
+                   metric = "RMSE",
+                   maximize = F,
+                   trControl = ctrl, 
+                   tuneGrid = gbm_grid)
+
+
+model_gbm$results |> 
+  rename(CV_RMSE = RMSE) |> 
+  mutate(min_CV_RMSE = as.numeric(shrinkage == model_gbm$bestTune$shrinkage)) |> 
+  ggplot(aes(x = shrinkage, y = CV_RMSE)) + 
+  geom_line(col = "grey55") + 
+  geom_point(size = 2, aes(col = factor(min_CV_RMSE))) + 
+  scale_x_continuous(trans = 'log10', breaks = 10^seq(-6, 0), labels = 10^seq(-6, 0), minor_breaks = NULL) + 
+  scale_color_manual(values = c("deepskyblue3", "green")) + 
+  theme(legend.position = "none") + 
+  labs(title = "AirBnB - Gradient Boosting", 
+       subtitle = "Selecting shrinkage parameter using cross-validation",
+       x = "Lambda (Shrinkage)", 
+       y = "CV RMSE")
+```
+this is the plot for 5 fold CV approach, may not use this
+```{r eval = F}
+summary(model_gbm$finalModel)
+
+# ggplot version:
+summary(model_gbm$finalModel, plotit = F)[1:9,] |> 
+  rename("Importance" = "rel.inf") |> 
+  ggplot(aes(x = fct_reorder(var, Importance), y = Importance, fill = Importance)) + 
+  geom_bar(stat = "identity") + 
+  geom_text(aes(label = round(Importance, 2), col = Importance), hjust = -0.2) + 
+  scale_y_continuous(limits = c(0, 60)) +
+  scale_fill_gradient(low = "grey40", high = "#28B463") + 
+  scale_color_gradient(low = "grey40", high = "#28B463") +
+  coord_flip() + 
+  theme(legend.position = "none") + 
+  labs(title = "Gradient Boosting", 
+       subtitle = "Variable Importance for AirBnB Price Prediction",
+       x = "Varname")
+```
+Plot with optimal lambda using validation set approach
+```{r}
+boost_TEMP <- gbm(price ~ . -first_review -host_since -last_review, 
+                    data = train, 
+                    distribution = "gaussian", 
+                    n.trees = 1000, 
+                    interaction.depth = 2, 
+                    shrinkage = boosting_lambda)
+
+# ggplot version:
+summary(boost_TEMP) |> 
+  rename("Importance" = "rel.inf") |> 
+  ggplot(aes(x = fct_reorder(var, Importance), y = Importance, fill = Importance)) + 
+  geom_bar(stat = "identity") + 
+  geom_text(aes(label = round(Importance, 2), col = Importance), hjust = -0.2) + 
+  scale_y_continuous(limits = c(0, 60)) +
+  scale_fill_gradient(low = "grey40", high = "#28B463") + 
+  scale_color_gradient(low = "grey40", high = "#28B463") +
+  coord_flip() + 
+  theme(legend.position = "none") + 
+  labs(title = "Gradient Boosting", 
+       subtitle = "Variable Importance for AirBnB Price Prediction",
+       x = "Varname")
 ```
 
 
@@ -216,7 +299,7 @@ Highest correlation with "accommodates". Use accommodates for polynomial fit.
 Here, we opt for K-fold CV to choose the optimal degree for the polynomial. 
 We perform 10-fold CV with 5 repeats.
 
-```{r eval = F}
+```{r eval = T}
 ctrl <- trainControl(method = "repeatedcv", number = 10, repeats = 5)
 
 CV_RMSE <- c()
@@ -248,7 +331,7 @@ data.frame(degree = 1:10, CV_RMSE = CV_RMSE) |>
 ```
 We find that polynomial degree 6 minimizes RMSE
 
-```{r eval = F}
+```{r eval = T}
 # store minimum polynomial RMSE for reference
 (min_poly_RMSE_raw <- min(CV_RMSE))
 ```
@@ -263,8 +346,8 @@ test_poly <- test_poly |> add_residuals(polymod, var = "poly_resid")
 ```
 
 ```{r}
-#summary(polymod)
-tidy(polymod)
+summary(polymod)
+#tidy(polymod)
 ```
 
 # Summary of test error for methods 
@@ -287,98 +370,24 @@ RMSE_summary |>
 
 
 
-######################################################REF############################################################
+###################################################Descriptive stats#######################################################
 
 ```{r}
-summary(model_gbm$finalModel)
+airbnb |> 
+  ggplot(aes(x = price)) +
+  geom_histogram(bins = 30) +
+  geom_vline(xintercept = mean(airbnb$price), color = "red") +
+  geom_vline(xintercept = median(airbnb$price), color = "green") +
+  labs(title = "AirBnB Dataset - Price Distribution",
+       subtitle = "Red line denotes mean, Green line denotes median") +
+  theme(legend.position = "bottom")
 
-# ggplot version:
-summary(model_gbm$finalModel, plotit = F) %>%
-  rename("Importance" = "rel.inf") %>%
-  ggplot(aes(x = reorder(var, Importance), y = Importance, fill = Importance)) + 
-  geom_bar(stat = "identity") + 
-  geom_text(aes(label = round(Importance, 2), col = Importance), hjust = -0.2) + 
-  scale_y_continuous(limits = c(0, 31.5)) +
-  scale_fill_gradient(low = "grey40", high = "#28B463") + 
-  scale_color_gradient(low = "grey40", high = "#28B463") +
-  coord_flip() + 
-  theme(legend.position = "none") + 
-  labs(title = "Hitters Dataset - Boosting - Variable Importance", 
-       x = "Varname")
-```
+airbnb |> 
+  ggplot(aes(x = city, y = price)) +
+  geom_boxplot() +
+  xlab("City") +
+  ylab("Price") +
+  labs(title = "AirBnB Dataset - Price Distribution by City",
+       subtitle = "Stratified Boxplots for Price")
 
-
-#########################################################################################################################
-
-# Cluster Analysis for NYC # 
-
-Top 3 priced listings
-```{r eval = F}
-head(airbnb |> arrange(desc(log_price)) |>  dplyr::select(log_price, city), 3) |> kable()
-```
-2 out of 3 top listings are from NYC. Perform cluster analysis in NYC 
-
-_Beginning NYC cluster analysis_ 
-
-This section requires the accompanying files nyc_boundaries.shp and nyc_boundaries.shx to run (to aid with the geographic map overlay).
-```{r, eval = F}
-airbnb <- read_csv("airbnb.csv",
-                  col_select = -c("id", "amenities", "description", "name", "thumbnail_url"))
-
-airbnb_NYC <- airbnb |> 
-  filter(city == 'NYC') |> 
-  filter(!is.na(neighbourhood)) |> 
-  filter(log_price >= 0.01)
-```
-
-Here, we create a best_value variable for NYC neighbourhoods, and pick the top 500 to work with.
-```{r, eval = F}
-airbnb_NYC |> 
-  group_by(neighbourhood) |> 
-  filter(!is.na(neighbourhood)) |> 
-  mutate(best_value = review_scores_rating/log_price) |> 
-  arrange(desc(best_value))
-
-top500_NYC <- head(airbnb_NYC, 500)
-```
-
-```{r, eval = F}
-num_listings = table(airbnb_NYC$neighbourhood)
-
-top500_NYC_nbr <- top500_NYC |> 
-  group_by(neighbourhood) |> 
-  filter(num_listings[as.character(neighbourhood)] > 50) |> 
-  summarize(count = n()) |> 
-  mutate(standardized_value = (round(100 * count/num_listings[as.character(neighbourhood)], digits = 4))) |>
-  mutate(count_listings = num_listings[as.character(neighbourhood)]) |> 
-  arrange(desc(standardized_value)) |> 
-  ungroup()
-```
-
-```{r, eval = F}
-top500_locations <- full_join(top500_NYC_nbr, top500_NYC, join_by(neighbourhood)) |> 
-  dplyr::select(neighbourhood, count, standardized_value, longitude, latitude)
-  
-top500 <- top500_locations |> 
-  group_by(neighbourhood) |> 
-  mutate(mean_long = mean(longitude),
-         mean_lat = mean(latitude),
-         standardized_value = as.numeric(standardized_value)) |> 
-  arrange(desc(standardized_value)) |> 
-  distinct(neighbourhood, standardized_value, count, mean_long, mean_lat)
-  
-top10_nbr <- head(top500, 10)
-```
-
-Here, we calculate density of best value listings based on standardized best value in neighborhoods within the top 500 Best Value AirBnb listings in NY. 
-```{r, eval = F}
-nyc <- sf::st_read(dsn = "nyc_boundaries.shp", quiet = TRUE)
-
-  ggplot() +
-  geom_sf(data = nyc, fill = "#d9f2f2") +
-  ggtitle("Best Value AirBnbs in NYC Neighborhoods") +
-  geom_point(data = top10_nbr, aes(x = mean_long, y = mean_lat, size = as.numeric(standardized_value), color = as.factor(neighbourhood))) +
-    scale_size_continuous(range = c(1, 4)) +
-  guides(size = guide_legend(title = "Density of Best Value Listings")) +
-  guides(color = guide_legend(title = "Neighborhood")) + theme_minimal()
 ```
