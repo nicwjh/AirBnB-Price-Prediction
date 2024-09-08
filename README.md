@@ -26,6 +26,8 @@ For tuning our LASSO model, we proceeded with a process of K-fold cross-validati
 
 For our polynomial regression model, we opt for a single-variable polynomial regression of *accommodates* against *price* after a correlation analysis. Subsequently, we apply repeated 10-fold cross-validation on the 80% training data to choose the degree of our polynomial. With input feature accommodates as our predictor, a model is fit for each polynomial degree (ranging from 1-10) using each of the 10 folds as a test set once. This process is repeated 5 times and averaged using the caret package. The average cross-validation RMSE over this repeated 10-fold CV is calculated for each polynomial degree and the polynomial degree with the lowest cross-validation RMSE is then chosen as the degree of our polynomial. Degree = 6 is chosen as the outcome of this process of hyperparameter tuning.
 
+![screenshot](Images/poly_cv.png)
+
 ### Results 
   
 
