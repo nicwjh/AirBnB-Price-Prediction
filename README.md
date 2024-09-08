@@ -28,6 +28,10 @@ For our polynomial regression model, we opt for a single-variable polynomial reg
 
 ![screenshot](Images/poly_cv.png)
 
+Lastly, we will discuss our process of hyperparameter tuning for gradient boosting. We apply gradient boosting through the gbm function in the caret package. In the caret package, there are several tuning parameters for the gbm function: number of iterations (n.trees), complexity of the tree (interaction.depth), learning rate (shrinkage), and minimum number of training set samples in a node to commence splitting (n.minobsinnode). We set these tuning parameters to be: n.trees = 1000, interaction.depth = 2, and n.minobsinnode = 10. For the shrinkage tuning parameter, we test a sequence of 61 different λ values ∈ [10-6, 1] through a validation set approach to find the optimal shrinkage parameter that achieves the lowest cross-validated RMSE on our test set. λ = 0.2512 achieves the lowest test error and is chosen as a result of this process of cross-validation.
+
+![screenshot](Images/boosting_cv.png)
+
 ### Results 
   
 
