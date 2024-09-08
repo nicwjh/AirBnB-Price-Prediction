@@ -36,12 +36,12 @@ Lastly, we will discuss our process of hyperparameter tuning for gradient boosti
 
 Forward selection has a RMSE of 98.32, LASSO has a RMSE of 100.07, polynomial regression has a RMSE of 115.88, and boosting has a RMSE of 85.11. These results are summarized in the following bar plot.
 
-![screenshot](test_RMSE.png)
+![screenshot](Images/test_RMSE.png)
 
 Forward selection and LASSO achieve comparable predictive performance. On the other hand, our boosting algorithm results in a substantial increase in performance through a 15% decrease in RMSE as compared to forward selection and LASSO. We hypothesize that nonlinearities are likely to be present in the data that are being explained by our nonlinear boosting method, resulting in a lower test RMSEI.
 
 We conclude the comparative analysis with feature inference through an ensemble feature selection process. The result of this process of robust feature selection is an observation that input features indicative of listing size and geographic location prove most informative for forecasting price. For brevity, we omit this discussion but present the variable importance plot from our gradient boosting method below for illustration of the above conclusion.
 
-![screenshot](var_importance.png)
+![screenshot](Images/var_importance.png)
 
 For detailed concluding remarks, limitations of our work, and possibilities for future work, please refer to the [final report](https://github.com/nicwjh/AirBnB-Price-Prediction/blob/main/Final_Report.pdf).  
