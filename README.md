@@ -16,6 +16,10 @@ As a high-level overview of our methodology, the data is first read and preproce
 
 ![screenshot](Images/image_1.png)
 
+### Training and hyperparameter tuning details 
+
+For tuning our LASSO model, we proceeded with a process of K-fold cross-validation to tune the $lambda$ hyperparameter. The $lambda$ tuning parameter, controlling the regularization penalty, is particularly pertinent for LASSO because different values of $lambda$ will result in different features being selected. This effectively makes LASSO a backwards greedy selection algorithm where the least useful features are the first to be eliminated by the regularization penalty. To accomplish this, we deploy repeated 5-fold cross-validation on the 80% training data (10 repeats). We optimize with the L1 penalty, select the remaining features with nonzero coefficients, train an unpenalized model with those features, and compare performance via RMSE. We repeat this process for 16 different values of λ (λ ∈ (0,0.3) with increments of 0.02) on each of the 5 folds and choose the λ that gives the best performance by RMSE. λ = 0.12 is chosen as the outcome of this process of cross-validation.
+
 ### Results 
   
 
