@@ -1,4 +1,4 @@
-We present a brief overview of our research project in this write-up. A more detailed exploration can be found [here](https://github.com/nicwjh/AirBnB-Price-Prediction/blob/main/Nicholas_Wong(ECON573_FinalReport).pdf).
+We present a brief overview of our research project in this write-up. A more detailed exploration can be found [here](https://github.com/nicwjh/AirBnB-Price-Prediction/blob/main/Final_Report.pdf).
 
 ## Project Overview
 
