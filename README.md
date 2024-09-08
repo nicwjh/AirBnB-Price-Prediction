@@ -18,9 +18,13 @@ As a high-level overview of our methodology, the data is first read and preproce
 
 ### Training and hyperparameter tuning details 
 
+In this section, we discuss our process of hyperparameter tuning for our LASSO regression, polynomial regression, and gradient boosting methods. 
+
 For tuning our LASSO model, we proceeded with a process of K-fold cross-validation to tune the $\lambda$ hyperparameter. The $\lambda$ tuning parameter, controlling the regularization penalty, is particularly pertinent for LASSO because different values of $\lambda$ will result in different features being selected. This effectively makes LASSO a backwards greedy selection algorithm where the least useful features are the first to be eliminated by the regularization penalty. To accomplish this, we deploy repeated 5-fold cross-validation on the 80% training data (10 repeats). We optimize with the L1 penalty, select the remaining features with nonzero coefficients, train an unpenalized model with those features, and compare performance via RMSE. We repeat this process for 16 different values of λ (λ ∈ (0,0.3) with increments of 0.02) on each of the 5 folds and choose the λ that gives the best performance by RMSE. λ = 0.12 is chosen as the outcome of this process of cross-validation.
 
 ![screenshot](Images/lasso_cv.png)
+
+For our polynomial regression model, we opt for a single-variable polynomial regression of *accommodates* against *price* after a correlation analysis. Subsequently, we apply repeated 10-fold cross-validation on the 80% training data to choose the degree of our polynomial. With input feature accommodates as our predictor, a model is fit for each polynomial degree (ranging from 1-10) using each of the 10 folds as a test set once. This process is repeated 5 times and averaged using the caret package. The average cross-validation RMSE over this repeated 10-fold CV is calculated for each polynomial degree and the polynomial degree with the lowest cross-validation RMSE is then chosen as the degree of our polynomial. Degree = 6 is chosen as the outcome of this process of hyperparameter tuning.
 
 ### Results 
   
