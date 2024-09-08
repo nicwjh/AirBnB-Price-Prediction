@@ -1,6 +1,6 @@
 # AirBnB Price Prediction with Supervised Machine Learning Methods
 
-We present a brief overview of our econometrics/machine learning research project in this write-up. A more detailed exploration can be found [here](https://github.com/nicwjh/AirBnB-Price-Prediction/blob/main/Final_Report.pdf).
+We present a brief overview of our econometrics research project in this write-up. A more detailed exploration can be found [here](https://github.com/nicwjh/AirBnB-Price-Prediction/blob/main/Final_Report.pdf).
 
 ## Project Overview
 
