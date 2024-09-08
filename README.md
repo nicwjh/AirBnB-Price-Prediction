@@ -8,10 +8,14 @@ This econometrics project explores the utilization of supervised machine learnin
 ### Data
 Experiments are run on the AirBnB listings in Major U.S. Cities Dataset sourced from the Kaggle repository [here](https://www.kaggle.com/datasets/rudymizrahi/airbnb-listings-in-major-us-cities-deloitte-ml). 
 
+After a process of data cleaning and wrangling, we end up with a training dataset with 38,111 observations and test dataset with 9,558 observations with 22 features, one of which is a target label *price*. Tuning parameters are selected and models are trained using the 80% training data. The 20% training data is used as unseen held-out data for model evaluation.  
+
 ### Methods
 
 As a high-level overview of our methodology, the data is first read and preprocessed. After data preprocessing, for models that need to be tuned, we conduct cross-validation on the training data to choose the tuning parameters for our methods. We then use a validation set approach to assess predictive performance on the held-out data for the following regression methods: forward selection, LASSO regression, polynomial regression, and boosting. Finally, results from our experiments are contrasted in a comparative analysis.  
 
 ![screenshot](Images/image_1.png)
-###  
+
+### Results 
+  
 
