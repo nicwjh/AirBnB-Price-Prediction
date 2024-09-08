@@ -1,4 +1,6 @@
-### Project Overview
+We present a brief overview of our research project in this write-up. A more detailed exploration can be found [here](https://github.com/nicwjh/AirBnB-Price-Prediction/blob/main/Nicholas_Wong(ECON573_FinalReport).pdf).
+
+## Project Overview
 
 This econometrics project explores the utilization of supervised machine learning methods for price prediction of AirBnB rental listings. The motive of this study is to attempt to build a price prediction model that can prognosticate the price of an AirBnB listing with maximum accuracy. Additionally, we conduct statistical inference on feature significance through a process of robust feature selection.  
 
